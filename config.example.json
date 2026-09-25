@@ -1,0 +1,7 @@
+{
+  "mail_from": "you@gmail.com",
+  "mail_to": "your_xxxxxx@kindle.com",
+  "smtp_relay": "smtp.gmail.com",
+  "smtp_port": 587,
+  "smtp_password": "Gmail app password, not the account password"
+}

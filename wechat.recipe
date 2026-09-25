@@ -1,0 +1,86 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# 微信公众号单篇文章 -> Kindle 友好的 epub。
+# 文章 URL 由环境变量 ARTICLE_URL 传入，一般通过 convert-article-to-epub.ps1 调用。
+import os
+
+from calibre.web.feeds.news import BasicNewsRecipe
+
+ARTICLE_URL = os.environ.get('ARTICLE_URL', '').strip()
+
+
+class WeChatArticle(BasicNewsRecipe):
+
+    title = '公众号文章'        # parse_index 里会被文章标题覆盖
+    language = 'zh-CN'          # 让 Kindle 走中文 fallback 链，而不是日文
+    encoding = 'utf-8'
+    timefmt = ''                # 不给标题加日期后缀
+    auto_cleanup = False
+
+    # calibre 自己注入的模板样式带 font-family / font-size，会让 Kindle 锁定"出版商字体"
+    conversion_options = {'filter_css': 'font-family,font-size,letter-spacing'}
+
+    # 原站样式同理全部丢掉；extra_css 里也不要出现 font-family
+    no_stylesheets = True
+    remove_attributes = ['style', 'class', 'id', 'width', 'height',
+                         'align', 'face', 'size', 'data-ratio', 'data-w']
+    extra_css = '''
+        body { line-height: 1.6; text-align: justify; }
+        p { margin: 0.6em 0; }
+        img { max-width: 100%; }
+        h1, h2 { text-align: left; }
+    '''
+
+    keep_only_tags = [
+        dict(name='h1', attrs={'id': 'activity-name'}),
+        dict(name='div', attrs={'id': 'js_content'}),
+    ]
+    remove_tags = [
+        dict(name='div', attrs={'class': ['qr_code_pc_outer', 'reward_area']}),
+        dict(name='mp-common-profile'), dict(name='mpprofile'),
+        dict(name='script'), dict(name='style'), dict(name='iframe'),
+    ]
+
+    def parse_index(self):
+        if not ARTICLE_URL:
+            raise ValueError('Environment variable ARTICLE_URL is not set.')
+
+        soup = self.index_to_soup(ARTICLE_URL)
+
+        h1 = soup.find('h1', id='activity-name')
+        title = h1.get_text().strip() if h1 else '公众号文章'
+        self.title = title
+
+        acct = soup.find(id='js_name')
+        if acct:
+            self.account = acct.get_text().strip()
+        else:
+            m = soup.find('meta', attrs={'property': 'og:article:author'})
+            self.account = (m.get('content') or '').strip() if m else '公众号'
+
+        return [(title, [{'title': title, 'url': ARTICLE_URL}])]
+
+    def preprocess_html(self, soup):
+        # 公众号图片懒加载，真实地址在 data-src，src 只是占位图
+        for img in soup.find_all('img'):
+            real = img.get('data-src') or img.get('data-croporisrc')
+            if real:
+                img['src'] = real
+        # <section> 套娃展平，避免 Kindle 上出现奇怪缩进
+        for sec in soup.find_all('section'):
+            sec.name = 'div'
+        return soup
+
+    def postprocess_book(self, oeb, opts, log):
+        # calibre 抓新闻时把 author / publisher 硬编码成 "calibre"
+        a = getattr(self, 'account', '公众号')
+        oeb.metadata.clear('creator')
+        oeb.metadata.add('creator', a)
+        oeb.metadata.clear('publisher')
+        oeb.metadata.add('publisher', a)
+
+    def get_browser(self, *a, **kw):
+        # mmbiz.qpic.cn 防盗链，图片请求要带 Referer
+        br = BasicNewsRecipe.get_browser(self, *a, **kw)
+        br.addheaders += [('Referer', 'https://mp.weixin.qq.com/')]
+        return br

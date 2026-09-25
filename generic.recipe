@@ -1,0 +1,110 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# 任意网页文章 -> Kindle 友好的 epub。
+# 文章 URL 由环境变量 ARTICLE_URL 传入，一般通过 convert-article-to-epub.ps1 调用。
+import os
+import re
+from urllib.parse import urlsplit
+
+from calibre.web.feeds.news import BasicNewsRecipe
+
+ARTICLE_URL = os.environ.get('ARTICLE_URL', '').strip()
+
+# 常见的正文容器 class / id，按优先级排。都命中不了就退回 auto_cleanup
+CONTENT_HINTS = ('post_content', 'post-content', 'entry-content', 'article-content',
+                 'article__body', 'post-body', 'postbody', 'markdown-body',
+                 'td-content', 'content-body', 'article-body')
+
+
+class GenericArticle(BasicNewsRecipe):
+
+    title = 'Article'           # parse_index 里会被文章标题覆盖
+    encoding = 'utf-8'
+    timefmt = ''                # 不给标题加日期后缀
+    auto_cleanup = True         # preprocess_html 命中容器时不会走到这里
+
+    # calibre 自己注入的模板样式带 font-family / font-size，会让 Kindle 锁定"出版商字体"。
+    # 代价是代码块失去等宽，靠 extra_css 里的 white-space 保住缩进和换行。
+    no_stylesheets = True
+    conversion_options = {'filter_css': 'font-family,font-size,letter-spacing'}
+    remove_attributes = ['style', 'width', 'height', 'align']
+    extra_css = '''
+        body { line-height: 1.6; }
+        p { margin: 0.6em 0; }
+        img { max-width: 100%; }
+        pre, code { white-space: pre-wrap; }
+        h1, h2, h3 { text-align: left; }
+    '''
+
+    remove_tags = [dict(name=['script', 'style', 'iframe', 'form', 'noscript'])]
+
+    def parse_index(self):
+        if not ARTICLE_URL:
+            raise ValueError('Environment variable ARTICLE_URL is not set.')
+
+        soup = self.index_to_soup(ARTICLE_URL)
+
+        t = ''
+        og = soup.find('meta', attrs={'property': 'og:title'})
+        if og and og.get('content'):
+            t = og['content'].strip()
+        if not t and soup.find('title'):
+            t = soup.find('title').get_text().strip()
+        # <title> 常带站名后缀，按分隔符切掉
+        t = re.split(r'\s*[|»–—·•]\s*', t)[0].strip() or 'Article'
+        self.title = t
+
+        site = soup.find('meta', attrs={'property': 'og:site_name'})
+        self.account = site['content'].strip() if (site and site.get('content')) \
+            else urlsplit(ARTICLE_URL).netloc
+
+        html = soup.find('html')
+        self.lang = ((html.get('lang') or html.get('xml:lang') or '') if html else '').strip() or 'en'
+
+        return [(t, [{'title': t, 'url': ARTICLE_URL}])]
+
+    def _pick_node(self, soup):
+        for hint in CONTENT_HINTS:
+            for attr in ('class', 'id'):
+                node = soup.find(attrs={attr: re.compile(re.escape(hint))})
+                if node is not None:
+                    self.log('content container:', node.name, attr, node.get(attr))
+                    return node
+        for name in ('article', 'main'):
+            node = soup.find(name)
+            if node is not None:
+                self.log('content container: <%s>' % name)
+                return node
+        node = soup.find(attrs={'role': 'main'})
+        if node is not None:
+            self.log('content container: role=main')
+        return node
+
+    def preprocess_html(self, soup):
+        # 只有 preprocess_html 这个钩子在抓取阶段真正会跑；
+        # 在 parse_index 里改 self.keep_only_tags / self.auto_cleanup 是无效的
+        node = self._pick_node(soup)
+        if node is None:
+            self.log('no content container matched, falling back to auto_cleanup')
+            return soup
+        body = soup.find('body')
+        if body is None:
+            return soup
+        keep = node.extract()
+        body.clear()
+        body.append(keep)
+        return soup
+
+    def postprocess_html(self, soup, first_fetch):
+        # 去掉 calibre 插在文章开头的导航栏，文末那条留着（带原文 URL）
+        for nb in soup.find_all('div', attrs={'class': 'calibre_navbar'}):
+            nb.extract()
+        return soup
+
+    def postprocess_book(self, oeb, opts, log):
+        # calibre 抓新闻时把 author / publisher 硬编码成 "calibre"
+        a = getattr(self, 'account', 'web')
+        for key, value in (('creator', a), ('publisher', a),
+                           ('language', getattr(self, 'lang', 'en'))):
+            oeb.metadata.clear(key)
+            oeb.metadata.add(key, value)
