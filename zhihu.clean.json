@@ -1,0 +1,11 @@
+{
+  "description": "知乎专栏文章（EpubPressX 导出）：去掉锁定字体的 CSS、知乎直答自动链接、开头的目录挂件",
+  "authors": "知乎",
+  "language": "zh",
+  "filter_css": "font-family,font-size,letter-spacing",
+  "search_replace": [
+    ["<a [^>]*href=\"https://zhida\\.zhihu\\.com[^\"]*\"[^>]*>(.*?)</a>", "\\1"],
+    ["<div><div><div><p><span>[^<]*(?:<svg[^>]*>(?:</svg>)?)?</span></p><p>目录</p></div><p>收起</p></div><div>(?:<div><p>[^<]*</p></div>)*</div></div>", ""],
+    ["<svg[^>]*>\\s*</svg>", ""]
+  ]
+}

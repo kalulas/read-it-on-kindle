@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # 任意网页文章 -> Kindle 友好的 epub。
-# 文章 URL 由环境变量 ARTICLE_URL 传入，一般通过 convert-article-to-epub.ps1 调用。
+# 文章 URL 由环境变量 ARTICLE_URL 传入，一般通过 read_it_on_kindle.py 调用。
 import os
 import re
 from urllib.parse import urlsplit
