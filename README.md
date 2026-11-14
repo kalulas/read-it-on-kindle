@@ -1,6 +1,6 @@
 # read-it-on-kindle
 
-用 calibre recipe 把网页文章处理为 Kindle 友好的 epub，并通过邮件推送到 Kindle。
+用 calibre recipe 把网页文章处理为 Kindle 友好的 epub，并通过邮件推送到 Kindle；读完后把 Kindle 导出的笔记同步回 Notion。
 
 - `wechat.recipe`：微信公众号文章
 - `generic.recipe`：通用网页（自动识别常见正文容器）
@@ -20,6 +20,10 @@ python read_it_on_kindle.py <url> --recipe wechat
 python read_it_on_kindle.py <url> --recipe generic --title "自定义书名"
 python read_it_on_kindle.py <url> --recipe generic --no-send
 python read_it_on_kindle.py <xxx.epub> --clean zhihu
+
+# 在 Kindle 手机 app 里把笔记本导出发到自己的 Gmail 后
+python sync_kindle_notes_to_notion.py --dry-run
+python sync_kindle_notes_to_notion.py
 ```
 
 生成的 epub 位于当前目录 `output/` 下。

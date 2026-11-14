@@ -3,5 +3,7 @@
   "mail_to": "your_xxxxxx@kindle.com",
   "smtp_relay": "smtp.gmail.com",
   "smtp_port": 587,
-  "smtp_password": "Gmail app password, not the account password"
+  "smtp_password": "Gmail app password, not the account password",
+  "notion_token": "secret_xxx from notion.so/my-integrations",
+  "notion_data_source_id": "data source id of the reading-notes database"
 }
