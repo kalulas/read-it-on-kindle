@@ -18,6 +18,7 @@ import time
 import urllib.error
 import urllib.request
 import zipfile
+from datetime import datetime
 from email.header import decode_header, make_header
 from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
@@ -246,8 +247,9 @@ def write_notion(config, book, url, blocks):
     ds = setting(config, 'notion_data_source_id')
     props = {
         'Name': {'title': rich_text(book['title'])},
-        'Type': {'select': {'name': 'Article'}},
+        'Type': {'select': {'name': 'Blog'}},
         'Status': {'select': {'name': 'Finished'}},
+        'Starts At': {'date': {'start': datetime.now().astimezone().isoformat(timespec='seconds')}},
     }
     if url:
         props['Link'] = {'url': url}
