@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """把网络文章做成 Kindle 友好的 epub 并推送到 Kindle。
 
-  python read_it_on_kindle.py https://mp.weixin.qq.com/s/<id> --recipe wechat
-  python read_it_on_kindle.py <url> --recipe generic --title '自己起的书名'
+  python read_it_on_kindle.py <url>
+  python read_it_on_kindle.py <url> --title '自己起的书名' --no-send
+  python read_it_on_kindle.py <url> --recipe generic
   python read_it_on_kindle.py <xxx.epub> --clean zhihu
-  python read_it_on_kindle.py <url> --recipe generic --no-send
 """
 import argparse
 import json
@@ -16,9 +16,12 @@ import sys
 import tempfile
 import uuid
 from pathlib import Path
+from urllib.parse import urlsplit
 
 HERE = Path(__file__).resolve().parent
 CONFIG_FILE = HERE / 'config.local.json'
+AUTO_RECIPES = {'mp.weixin.qq.com': 'wechat'}
+DEFAULT_RECIPE = 'generic'
 
 if sys.platform == 'darwin':
     CALIBRE_DIRS = ['/Applications/calibre.app/Contents/MacOS']
@@ -213,8 +216,6 @@ def main():
         parser.error('file not found: %s' % args.source)
     if local and not args.clean:
         parser.error('local files need --clean (e.g. --clean zhihu)')
-    if not local and not args.recipe:
-        parser.error('URLs need --recipe (e.g. --recipe generic)')
     if local and args.recipe:
         parser.error('--recipe only applies to URLs; use --clean for local files')
     if not local and args.clean:
@@ -223,7 +224,11 @@ def main():
     config = load_config()
     ebook_convert = resolve_calibre_tool('ebook-convert')
     ebook_meta = resolve_calibre_tool('ebook-meta')
-    recipe = None if local else resolve_recipe(args.recipe)
+    recipe_name = args.recipe
+    if not local and not recipe_name:
+        recipe_name = AUTO_RECIPES.get((urlsplit(args.source).hostname or '').lower(), DEFAULT_RECIPE)
+        print('Recipe: %s (auto)' % recipe_name)
+    recipe = None if local else resolve_recipe(recipe_name)
     preset = load_clean_preset(resolve_clean_preset(args.clean)) if local else None
 
     out_dir = Path(setting(config, 'out_dir', args.out_dir, HERE / 'output')).expanduser()

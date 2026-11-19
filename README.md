@@ -16,9 +16,9 @@
 ## 用法
 
 ```bash
-python read_it_on_kindle.py <url> --recipe wechat
-python read_it_on_kindle.py <url> --recipe generic --title "自定义书名"
-python read_it_on_kindle.py <url> --recipe generic --no-send
+python read_it_on_kindle.py <url>
+python read_it_on_kindle.py <url> --title "自定义书名" --no-send
+python read_it_on_kindle.py <url> --recipe generic
 python read_it_on_kindle.py <xxx.epub> --clean zhihu
 
 # 在 Kindle 手机 app 里把笔记本导出发到自己的 Gmail 后
